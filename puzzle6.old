@@ -1,0 +1,97 @@
+import numpy as np
+from collections import defaultdict
+
+def mh_dist(p1, p2):
+    return np.sum(np.abs(p1-p2))
+
+def remove_outer_points(l_pts):
+    [xmax, ymax] = np.max(l_pts, axis=0)
+    [xmin, ymin] = np.min(l_pts, axis=0)
+    return np.array([pt for pt in l_pts if (pt[0] not in (xmin, xmax)) and
+                     (pt[1] not in (ymin, ymax))])
+
+def closest(coord, l_pts):
+    min_dist = None
+    for i, pt in enumerate(l_pts):
+        if mh_dist(pt, coord) < min_dist:
+
+
+def find_clearance(pt, l_pts):
+    dist = [(tgt_pt, mh_dist(pt, tgt_pt)) for tgt_pt in l_pts]
+    dist = sorted(dist, key=lambda x: x[1])
+
+    # Now find borders
+    # [upper_left, upper_right, bottom_left, bottom_right]
+    neigh = np.zeros((4, 2), dtype="int16")
+    clearance = 0
+    for tgt_pt, d in dist[1:]:
+        if not neigh[0].any() and (tgt_pt[0] < pt[0]) and (tgt_pt[1] < pt[1]):
+            neigh[0] = tgt_pt
+            clearance += d
+        elif not neigh[1].any() and (tgt_pt[0] > pt[0]) and (tgt_pt[1] < pt[1]):
+            neigh[1] = tgt_pt
+            clearance += d
+        elif not neigh[2].any() and (tgt_pt[0] < pt[0]) and (tgt_pt[1] > pt[1]):
+            neigh[2] = tgt_pt
+            clearance += d
+        elif not neigh[3].any() and (tgt_pt[0] > pt[0]) and (tgt_pt[1] > pt[1]):
+            neigh[3] = tgt_pt
+            clearance += d
+    return clearance
+
+def find_point(l_pts):
+    # rng = range(cand_pts.shape[0])
+    # d = {i: 0 for i in rng}
+    d = defaultdict(dict)
+    for point in l_pts:
+        d["{}".format(point)] = [point, find_clearance(point, l_pts)]
+    cand_pts = remove_outer_points(l_pts)
+
+    d = {"{}".format(pt):d["{}".format(pt)] for pt in cand_pts}
+
+    return d[max(d, key=lambda x:x[1])]
+
+def circle_coords_2d(r=0, origin=[0, 0]):
+    if r == 0:
+        return np.array([origin])
+    coords = []
+    for x in range(r+1):
+        coords.append([x, r-x])
+        coords.append([-x, x-r])
+        if x%r:
+            coords.append([x, x-r])
+            coords.append([-x, r-x])
+    return (np.array(coords) + origin)
+
+def calculate_area(origin, l_pts, max_r=100):
+    area = 0
+    l_pts = np.delete(l_pts, np.where(l_pts==origin)[0], axis=0)
+
+    for r in range(max_r):
+        coords = circle_coords_2d(r, origin)
+        start_area = area
+        distance = mh_dist(origin, coords[0])
+        for coord in coords:
+            if distance < min([mh_dist(pt, coord) for pt in l_pts]):
+                area += 1
+        if start_area == area:
+            return area
+
+def calculate_grid(l_pts):
+    [xmax, ymax] = np.max(l_pts, axis=0)
+    [xmin, ymin] = np.min(l_pts, axis=0)
+    grid = {(x, y): closest(x, y) if (x, y) not in eqidistant else -1 for x, y in squares()}
+
+def main():
+    with open("puzzle6.txt", 'r') as f:
+        l_pts = [[int(x) for x in point.split(", ")] for point in f]
+        l_pts = np.array(l_pts)
+
+    # l_pts = np.array([[1, 1], [1, 6], [8, 3], [3, 4], [5, 5], [8, 9]])
+    d_point = find_point(l_pts)
+    print(d_point)
+    area = calculate_area(d_point[0], l_pts, 500)
+    print(area)
+
+if __name__ == "__main__":
+    main()
